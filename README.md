@@ -15,19 +15,19 @@ Estimo que se necesitará en el orden de **20 GB de espacio libre en disco** (id
 
 ## 1. Descargar los datos de IMDb
 
-Descarga los siguientes siete archivos desde <https://datasets.imdbws.com/> (el conteo de filas es correcto desde 2026-10-21 y incluye el encabezado): 
+Descarga los siguientes siete archivos desde <https://datasets.imdbws.com/> (en total, unos **2 GB** comprimidos). IMDb actualiza los archivos a diario, así que el conteo de filas puede variar levemente (el conteo indicado es del 2026-10-21 e incluye el encabezado):
 
-- `name.basics.tsv.gz` (12.881.969 filas)
-- `title.akas.tsv.gz` (59.861.136 filas)
-- `title.basics.tsv.gz` (12.881.968 filas)
-- `title.crew.tsv.gz` (12.881.680 filas)
-- `title.episode.tsv.gz` (9.963.519 filas)
-- `title.principals.tsv.gz` (102.408.464 filas)
-- `title.ratings.tsv.gz` (1.723.236 filas)
+- `name.basics.tsv.gz` (15.751.277 filas)
+- `title.akas.tsv.gz` (59.861.137 filas)
+- `title.basics.tsv.gz` (12.882.528 filas)
+- `title.crew.tsv.gz` (12.882.528 filas)
+- `title.episode.tsv.gz` (9.963.742 filas)
+- `title.principals.tsv.gz` (102.413.746 filas)
+- `title.ratings.tsv.gz` (1.723.303 filas)
 
-Guárdalos juntos en una carpeta, por ejemplo, `big-data-cine/data/`.
+Guárdalos juntos en una carpeta, por ejemplo, `big-data-cine/data/` (esta carpeta está en `.gitignore`, para no subir los datos al repositorio por error).
 
-**No es necesario descomprimirlos:** Spark puede leer directamente los archivos `.tsv.gz`.
+**No es necesario descomprimirlos:** Spark puede leer directamente los archivos `.tsv.gz`. Eso sí, un archivo `.gz` no se puede dividir, por lo que Spark lee cada archivo con una sola tarea: la primera lectura de los archivos grandes puede tardar algo más.
 
 Los archivos contienen datos en formato **TSV** (*tab-separated values*, similar a CSV, pero con tabs como separadores). La descripción de cada archivo está en la [documentación de los conjuntos de datos no comerciales de IMDb](https://data.imdb.com/non-commercial-datasets/). (Solo se pueden usar estos datos para fines no comerciales.)
 
@@ -35,7 +35,7 @@ Los archivos contienen datos en formato **TSV** (*tab-separated values*, similar
 
 ## 2. Comprobar Java
 
-Necesitamos **Java 17 o una versión posterior compatible con Spark**. Abre una terminal (en Windows, **PowerShell**, o en adelente también "_terminal_" cuando no importe si usas Windows, macOS o Linux) y ejecuta:
+Necesitamos **Java 17 o 21** (versiones LTS soportadas por Spark 4). Abre una terminal (en Windows, **PowerShell**, o en adelante también "_terminal_" cuando no importe si usas Windows, macOS o Linux) y ejecuta:
 
 ```bash
 java -version
@@ -47,7 +47,7 @@ Deberías ver algo parecido a:
 openjdk version "17.0.x" ...
 ```
 
-Si aparece una versión 17 o superior, puedes continuar. Si Java no está instalado o la versión es anterior, instala un JDK desde [Eclipse Temurin (Adoptium)](https://adoptium.net/).
+Si aparece la versión 17 o 21, puedes continuar. Si Java no está instalado o la versión es anterior, instala un JDK desde [Eclipse Temurin (Adoptium)](https://adoptium.net/).
 
 En Windows, durante la instalación, habilita la opción **“Set or override JAVA_HOME variable”** y, si está disponible, la opción para agregar Java a `PATH`. Cierra y vuelve a abrir PowerShell antes de repetir `java -version`.
 
@@ -65,7 +65,7 @@ $env:JAVA_HOME
 printenv JAVA_HOME
 ```
 
-La ruta debería apuntar a la carpeta del JDK, por ejemplo, `C:\Program Files\Eclipse Adoptium\jdk-17...` en Windows. La ubicación exacta depende del sistema, pero debería ser una carpeta con el nombre `jdk-XX...` donde `XX` es una versión (igual o mayor que 17).
+La ruta debería apuntar a la carpeta del JDK, por ejemplo, `C:\Program Files\Eclipse Adoptium\jdk-17...` en Windows. La ubicación exacta depende del sistema, pero debería ser una carpeta con el nombre `jdk-XX...` donde `XX` es la versión (17 o 21).
 
 Verifica de nuevo con `java -version`.
 
@@ -133,15 +133,18 @@ spark = (
     SparkSession.builder
     .master("local[*]")
     .appName("big-data-cine")
+    .config("spark.driver.memory", "4g")
     .getOrCreate()
 )
 
 spark.range(2).count()
 ```
 
+(La línea `spark.driver.memory` le da 4 GB de memoria a Spark; el valor por defecto, 1 GB, no alcanza para los archivos más grandes. Si tu computador tiene poca RAM, puedes probar con `"2g"`.)
+
 Haz clic en el botón **▶** o presiona **Shift + Enter**.
 
-Espera unos segundos (la primera ejecución puede tardar un poco más). Debajo de la celda debería aparecer una nueva celda, y luego de algunos segundos debería aparecer:
+Espera unos segundos (la primera ejecución puede tardar un poco más). Debajo de la celda debería aparecer el resultado:
 
 ```text
 2
@@ -154,4 +157,7 @@ Espera unos segundos (la primera ejecución puede tardar un poco más). Debajo d
 - **`python` no se reconoce:** prueba `python3` o, en Windows, `py`.
 - **`No module named pip` o `No module named jupyterlab`:** revisa que estés usando el mismo intérprete de Python para instalar y ejecutar JupyterLab.
 - **`java` no se reconoce:** revisa la instalación de Java, `PATH` y `JAVA_HOME`; después abre una terminal nueva.
+- **Advertencia `Did not find winutils.exe` / `HADOOP_HOME and hadoop.home.dir are unset` (Windows):** puedes ignorarla; Spark lee los datos sin problema.
+- **Advertencia `PySpark does not yet fully support pandas >= 3.0.0`:** puedes ignorarla para este taller.
+- **`OutOfMemoryError` o `Java heap space`:** aumenta `spark.driver.memory` (por ejemplo, a `"6g"`), reinicia el kernel y vuelve a ejecutar.
 - **¿Otros?** Al usar nuestros propios computadores, es difícil controlar todas las permutaciones de sistemas operativos, software ya instalado, recursos disponibles, etc. Puedes intentar Googlear o (con cuidado) usar la IA para resolver el problema. Pero es opcional: durante el taller vamos a ver una demostración.
